@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Transactions · Pocket Ledger{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">YOUR MONEY, IN VIEW</div><h1>Transactions<span class="heading-spark">✳</span></h1><p class="subtitle">A simple place to keep track of everyday spending.</p></div><a class="text-link" href="#add-expense">＋ Add an expense</a></div>
+
+<section class="summary-grid">
+  <article class="summary-card total-card spending-summary-card"><div class="summary-top"><span class="summary-label">SPENDING IN RESULTS</span><span class="summary-icon mint-icon">↗</span></div><div class="summary-value">{{ total|money }}</div><div class="summary-foot"><span class="mini-line"></span> For the current filters</div><div class="activity-in-spending"><div class="eyebrow">ACTIVITY IN RESULTS</div><div class="activity-metrics"><div><span class="activity-number">{{ count }}</span><span class="activity-caption">matching entr{% if count == 1 %}y{% else %}ies{% endif %}</span></div><div class="activity-divider"></div><div><span class="activity-number">{{ category_totals|length }}</span><span class="activity-caption">categor{% if category_totals|length == 1 %}y{% else %}ies{% endif %}</span></div></div></div><div class="result-glance"><div class="eyebrow">AT A GLANCE</div>
+    {% if category_totals %}{% for row in category_totals[:3] %}<div class="result-category"><div><span>{{ row.category }}</span><b>{{ row.total|money }}</b></div><div class="bar-track"><div class="bar-fill bar-{{ loop.index0 % 6 }}" style="width: {{ (row.total * 100 / total)|round|int if total else 0 }}%"></div></div></div>{% endfor %}
+      {% if category_totals|length > 3 %}<details class="remaining-categories"><summary>View all {{ category_totals|length }} categories</summary><div>{% for row in category_totals %}<p><span>{{ row.category }}</span><b>{{ row.total|money }}</b></p>{% endfor %}</div></details>{% endif %}
+    {% else %}<div class="category-empty">Category totals will appear once entries match these filters.</div>{% endif %}
+  </div></article>
+  <article class="summary-card budget-card summary-budget-card"><div class="budget-heading"><div><div class="eyebrow">MONTHLY PLAN</div><h3>Total Amount Ready for Expenditure</h3></div><span class="budget-icon">₹</span></div>
+    <div class="budget-month-label">{{ budget_month }}{% if budget_month == current_month %}<span>THIS MONTH</span>{% endif %}</div>
+    <div class="budget-ready {% if available_total < 0 %}negative-balance{% endif %}">{{ available_total|money }}</div>
+    <div class="budget-caption">{{ spent_total|money }} spent · {{ (savings_total * 100)|money }} to save of {{ (budget_total * 100)|money }}</div>
+    <details class="budget-expanded"><summary>View balances and manage amounts</summary>
+      <div class="budget-people">{% for person in spenders %}<div class="budget-person"><div class="budget-person-line"><strong>{{ person }}</strong><span class="person-available {% if available[person] < 0 %}negative-balance{% endif %}">{{ available[person]|money }} left</span></div></div>{% endfor %}</div>
+      <details class="budget-details"><summary>View planned and spent amounts</summary><div>{% for person in spenders %}<p><strong>{{ person }}</strong><span>{{ (allocated[person] * 100)|money }} planned · {{ spent[person]|money }} spent</span></p>{% endfor %}</div></details>
+      {% if budget_updated_at %}<div class="budget-updated">Amounts last saved {{ budget_updated_at|replace('T', ' · ') }}</div>{% endif %}
+      <details class="budget-editor"><summary>Set monthly amounts</summary><form method="post" action="{{ url_for('save_budget') }}"><label class="budget-month-input">MONTH<input type="month" name="month" value="{{ budget_month }}" required></label>{% for person in spenders %}<label class="budget-input">{{ person }} <span>₹</span><input type="number" name="{{ spender_columns[person] }}" min="0" step="1" value="{{ allocated[person] }}" required></label>{% endfor %}<button class="button submit-button" type="submit">Save monthly amounts <span>↗</span></button></form></details>
+    </details>
+  </article>
+  <article class="summary-card savings-card"><div class="budget-heading"><div><div class="eyebrow">SAVING FOR NEXT MONTH</div><h3>Monthly Savings Target</h3></div><span class="savings-icon">↗</span></div>
+    <div class="budget-month-label">{{ budget_month }}{% if budget_month == current_month %}<span>THIS MONTH</span>{% endif %}</div>
+    <div class="budget-ready savings-total">{{ (savings_total * 100)|money }}</div>
+    <div class="budget-caption">Planned to set aside for next month</div>
+    <details class="savings-expanded"><summary>View and set targets by person</summary>
+      <div class="savings-people">{% for person in spenders %}<p><strong>{{ person }}</strong><span>{{ (savings_targets[person] * 100)|money }}</span></p>{% endfor %}</div>
+      {% if savings_updated_at %}<div class="budget-updated">Targets last saved {{ savings_updated_at|replace('T', ' · ') }}</div>{% endif %}
+      <form method="post" action="{{ url_for('save_savings_targets') }}" class="savings-form"><label class="budget-month-input">MONTH<input type="month" name="month" value="{{ budget_month }}" required></label>{% for person in spenders %}<label class="budget-input">{{ person }} <span>₹</span><input type="number" name="{{ spender_columns[person] }}_savings" min="0" step="1" value="{{ savings_targets[person] }}" required></label>{% endfor %}<button class="button submit-button" type="submit">Save savings targets <span>↗</span></button></form>
+    </details>
+  </article>
+</section>
+
+<section class="ledger-layout">
+  <div class="ledger-main">
+    <div class="section-heading"><div><div class="eyebrow">THE PAPER TRAIL</div><h2>{% if selected_categories %}Filtered entries{% else %}Recent entries{% endif %}</h2></div></div>
+    <div class="table-card">
+      <form method="get" action="{{ url_for('index') }}" class="search-filters">
+        <details class="category-picker" {% if selected_categories %}open{% endif %}><summary><span>Category</span><b>{% if selected_categories %}{{ selected_categories|length }} selected{% else %}All categories{% endif %}</b></summary><div class="category-options">{% for cat in categories %}<label><input type="checkbox" name="category" value="{{ cat }}" {% if cat in selected_categories %}checked{% endif %}><span>{{ cat }}</span></label>{% endfor %}</div></details>
+        <label class="search-field"><span>⌕</span><input type="search" name="q" value="{{ search }}" placeholder="Search products…" aria-label="Search products"></label>
+        <label class="date-field"><span>From</span><input type="date" name="start_date" value="{{ start_date }}" aria-label="Start date"></label>
+        <label class="date-field"><span>To</span><input type="date" name="end_date" value="{{ end_date }}" aria-label="End date"></label>
+        <button type="submit" class="filter-button">Apply</button>
+        {% if search or start_date or end_date or selected_categories %}<a class="clear-filters" href="{{ url_for('index') }}">Clear</a>{% endif %}
+        <a class="export-button" href="{{ url_for('export_csv', q=search, category=selected_categories, start_date=start_date, end_date=end_date) }}">↓ CSV</a>
+      </form>
+      {% if entries %}
+      <div class="table-scroll"><table><thead><tr><th>ITEM</th><th>CATEGORY</th><th>SPENT BY</th><th>DATE &amp; TIME ADDED</th><th class="amount-col">AMOUNT</th><th></th></tr></thead><tbody>
+      {% for entry in entries %}<tr><td><div class="product-cell"><span class="product-mark mark-{{ loop.index0 % 6 }}">{{ entry.product[:1]|upper }}</span><span class="product-name">{{ entry.product }}</span></div></td><td><span class="category-pill pill-{{ categories.index(entry.category) % 8 }}">{{ entry.category }}</span></td><td class="spent-by-cell">{{ entry.spent_by }}</td><td class="date-cell">{{ entry.created_at|replace('T', ' · ') }}</td><td class="amount-cell">{{ entry.amount_cents|money }}</td><td class="actions"><a href="{{ url_for('edit_entry', entry_id=entry.id) }}" aria-label="Edit {{ entry.product }}">Edit</a><form method="post" action="{{ url_for('delete_entry', entry_id=entry.id) }}" onsubmit="return confirm('Delete this expense?')"><button aria-label="Delete {{ entry.product }}">×</button></form></td></tr>{% endfor %}
+      </tbody></table></div><div class="table-bottom"><span>Showing {{ entries|length }} entr{% if entries|length == 1 %}y{% else %}ies{% endif %}{% if selected_categories %} across {{ selected_categories|length }} categor{% if selected_categories|length == 1 %}y{% else %}ies{% endif %}{% endif %}</span><strong>Visible total <b>{{ visible_total|money }}</b></strong></div>
+      {% else %}<div class="empty-state"><span class="empty-icon">✳</span><h3>Your ledger starts here</h3><p>Add your first expense and it’ll show up right here, with its date and time.</p><a class="button button-small" href="#add-expense">Add your first entry</a></div>{% endif %}
+    </div>
+  </div>
+  <aside class="right-column">
+    <section class="add-card" id="add-expense"><div class="add-card-head"><div><div class="eyebrow light-eyebrow">A MOMENT TO NOTE</div><h3>Add an expense</h3></div><span class="add-plus">＋</span></div><p class="add-description">A quick note now makes looking back easier later.</p>
+      <form method="post" action="{{ url_for('add_entry') }}" class="expense-form"><label for="product">WHAT WAS IT?</label><input id="product" name="product" type="text" maxlength="120" placeholder="e.g. Market vegetables" required><div class="form-row"><div class="form-field"><label for="amount">AMOUNT (₹)</label><input id="amount" name="amount" type="number" min="0" step="0.01" placeholder="0.00" required></div><div class="form-field"><label for="category">CATEGORY</label><select id="category" name="category" required><option value="" disabled selected>Choose one</option>{% for cat in categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}</select></div></div><div class="form-field spender-field"><label for="spent_by">SPENT BY</label><select id="spent_by" name="spent_by" required><option value="" disabled selected>Choose who paid</option>{% for spender in spenders %}<option value="{{ spender }}">{{ spender }}</option>{% endfor %}</select></div><div class="date-hint"><span>◷</span> Date and time are saved automatically</div><button class="button submit-button" type="submit">Save expense <span>↗</span></button></form>
+    </section>
+  </aside>
+</section>
+{% endblock %}
