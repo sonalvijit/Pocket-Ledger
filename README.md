@@ -2,6 +2,10 @@
 
 A small personal expense ledger built with Flask and SQLite. Record a product or expense, its price, category, who paid, and the date/time it was entered. Entries are stored locally in `ledger.db`.
 
+## Preview
+
+![Pocket Ledger screenshot](img/Screenshot%202026-10-13%20093005.png)
+
 ## Run locally
 
 1. Create and activate a virtual environment:
